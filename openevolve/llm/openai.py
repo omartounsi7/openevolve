@@ -155,9 +155,12 @@ class OpenAILLM(LLMInterface):
             params = {
                 "model": self.model,
                 "messages": formatted_messages,
-                "temperature": kwargs.get("temperature", self.temperature),
                 "max_tokens": kwargs.get("max_tokens", self.max_tokens),
             }
+            # Omit temperature when unset: some models (e.g. Claude 5.5) reject it outright
+            temperature = kwargs.get("temperature", self.temperature)
+            if temperature is not None:
+                params["temperature"] = temperature
             top_p = kwargs.get("top_p", self.top_p)
             if top_p is not None:
                 params["top_p"] = top_p

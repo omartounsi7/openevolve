@@ -496,11 +496,10 @@ class Config:
             except re.error as e:
                 raise ValueError(f"Invalid regex pattern in diff_pattern: {e}")
 
-        # Remove None values for temperature and top_p to avoid dacite type errors;
-        # alternatively, pass check_types=False to dacite.from_dict, but that can hide other issues
+        # Remove None values for top_p to avoid dacite type errors;
+        # alternatively, pass check_types=False to dacite.from_dict, but that can hide other issues.
+        # temperature is kept so that `temperature: null` really disables it (some models reject it).
         if "llm" in config_dict:
-            if "temperature" in config_dict["llm"] and config_dict["llm"]["temperature"] is None:
-                del config_dict["llm"]["temperature"]
             if "top_p" in config_dict["llm"] and config_dict["llm"]["top_p"] is None:
                 del config_dict["llm"]["top_p"]
             # 'model' is not a config field (models are 'llm.models' or

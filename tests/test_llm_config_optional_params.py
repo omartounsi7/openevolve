@@ -47,8 +47,8 @@ class TestOptionalTemperatureTopP(unittest.TestCase):
 class TestConfigFromDictWithOptionalParams(unittest.TestCase):
     """Tests for loading config with optional temperature/top_p from dict"""
 
-    def test_config_with_null_temperature_uses_default(self):
-        """Test loading config with null temperature uses default"""
+    def test_config_with_null_temperature_disables_it(self):
+        """Test loading config with null temperature leaves it unset (not the 0.7 default)"""
         config_dict = {
             "llm": {
                 "primary_model": "claude-sonnet",
@@ -57,8 +57,9 @@ class TestConfigFromDictWithOptionalParams(unittest.TestCase):
             }
         }
         config = Config.from_dict(config_dict)
-        # None is stripped, so default 0.7 is used
-        self.assertEqual(config.llm.temperature, 0.7)
+        self.assertIsNone(config.llm.temperature)
+        for model in config.llm.models:
+            self.assertIsNone(model.temperature)
 
     def test_config_with_null_top_p(self):
         """Test loading config with null top_p"""
@@ -125,3 +126,33 @@ class TestConfigFromDictWithOptionalParams(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOpenAIOmitsNoneTemperature(unittest.TestCase):
+    """The request must not contain `temperature` when it is unset"""
+
+    def _request_params(self, temperature):
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from openevolve.llm.openai import OpenAILLM
+
+        cfg = LLMModelConfig(
+            name="claude-haiku-5-5",
+            api_key="test",
+            api_base="https://api.anthropic.com/v1/",
+            temperature=temperature,
+            max_tokens=100,
+            retries=0,
+        )
+        with patch("openevolve.llm.openai.openai.OpenAI"):
+            llm = OpenAILLM(cfg)
+        llm._call_api = AsyncMock(return_value="ok")
+        asyncio.run(llm.generate_with_context("sys", [{"role": "user", "content": "hi"}]))
+        return llm._call_api.call_args[0][0]
+
+    def test_temperature_omitted_when_none(self):
+        self.assertNotIn("temperature", self._request_params(None))
+
+    def test_temperature_sent_when_set(self):
+        self.assertEqual(self._request_params(0.3)["temperature"], 0.3)
